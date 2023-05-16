@@ -49,13 +49,13 @@ release_file() {
 
 	case "$(uname -m)" in
 	aarch64) arch="arm64" ;;
-	amd64) arch="amd64" ;;
+	x86_64) arch="amd64" ;;
 	*)
 		fail "Sorry, $TOOL_NAME is not supported on $(uname -m)."
 		;;
 	esac
 
-	echo "${TOOL_NAME}-${version}-${os}-${arch}.${suffix}"
+	echo "${TOOL_NAME}-v${version}-${os}-${arch}.${suffix}"
 }
 
 download_release() {
