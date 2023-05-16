@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for rf.
-GH_REPO="https://github.com/buty4649/rf"
+REPO="buty4649/rf"
+GH_REPO="https://github.com/${REPO}"
 TOOL_NAME="rf"
 TOOL_TEST="rf -v"
 
@@ -24,25 +24,46 @@ sort_versions() {
 		LC_ALL=C sort -t. -k 1,1 -k 2,2n -k 3,3n -k 4,4n -k 5,5n | awk '{print $2}'
 }
 
-list_github_tags() {
-	git ls-remote --tags --refs "$GH_REPO" |
-		grep -o 'refs/tags/.*' | cut -d/ -f3- |
-		sed 's/^v//' # NOTE: You might want to adapt this sed to remove non-version strings from tags
+list_all_versions() {
+	local url="https://api.github.com/repos/${REPO}/releases"
+	curl "${curl_opts[@]}" "$url" |
+		awk -F: '/tag_name/{gsub(/^.*"v|",$/,"",$2);print $2}'
 }
 
-list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if rf has other means of determining installable versions.
-	list_github_tags
+release_file() {
+	local version="$1"
+
+	case "$(uname | tr "[:upper:]" "[:lower:]")" in
+	darwin)
+		os="darwin"
+		suffix="zip"
+		;;
+	linux)
+		os="linux"
+		suffix="tar.gz"
+		;;
+	*)
+		fail "Sorry, $TOOL_NAME is not supported on $(uname)."
+		;;
+	esac
+
+	case "$(uname -m)" in
+	aarch64) arch="arm64" ;;
+	amd64) arch="amd64" ;;
+	*)
+		fail "Sorry, $TOOL_NAME is not supported on $(uname -m)."
+		;;
+	esac
+
+	echo "${TOOL_NAME}-${version}-${os}-${arch}.${suffix}"
 }
 
 download_release() {
-	local version filename url
+	local version filename url os arch suffix
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for rf
-	url="$GH_REPO/archive/v${version}.tar.gz"
+	url="$GH_REPO/releases/download/v${version}/$(release_file "$version")"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
@@ -61,7 +82,6 @@ install_version() {
 		mkdir -p "$install_path"
 		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
-		# TODO: Assert rf executable exists.
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
